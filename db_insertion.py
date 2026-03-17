@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
+import asyncio
 
 load_dotenv()
 
@@ -24,7 +25,7 @@ class DB_Connection():
             huggingfacehub_api_token=embedding_api_key,
         )
         
-    def chunks_converter(self, data):
+    async def chunks_converter(self, data):
         docs_to_insert = []
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         documents = text_splitter.split_documents(data)
@@ -35,13 +36,14 @@ class DB_Connection():
         for text, emb in zip(texts, embeddings):
             item = {"text":text,'embeddings':emb}
             docs_to_insert.append(item)
-        return docs_to_insert
+        result = await self.uploading_into_db(docs_to_insert)
+        return result
            
-    def pdf_loader(self,file_path):
+    async def pdf_loader(self,file_path):
         loader = PyPDFLoader(file_path)
         data = loader.load()
         print(type(data))
-        result = self.chunks_converter(data)
+        result = await self.chunks_converter(data)
         return result
     
     async def uploading_into_db(self,docs_to_insert):
@@ -57,16 +59,16 @@ class DB_Connection():
     
 db_connection = DB_Connection()
 
-def main():
+async def main():
     input_file_path = input("Enter File path :").strip('"')
     file_path = rf"{input_file_path}"
-    result = db_connection.pdf_loader(file_path)
+    result = await db_connection.pdf_loader(file_path)
     print(result)
 
 
 
 if __name__=='__main__':
-    main()
+    asyncio.run(main())
 
 
 
