@@ -649,6 +649,7 @@ dependencies = [
     { name = "langchain-huggingface" },
     { name = "langchain-text-splitters" },
     { name = "motor" },
+    { name = "pymongo" },
     { name = "pypdf" },
 ]
 
@@ -658,6 +659,7 @@ requires-dist = [
     { name = "langchain-huggingface", specifier = ">=1.2.1" },
     { name = "langchain-text-splitters", specifier = ">=1.1.1" },
     { name = "motor", specifier = ">=3.7.1" },
+    { name = "pymongo", specifier = ">=4.16.0" },
     { name = "pypdf", specifier = ">=6.9.1" },
 ]
 
