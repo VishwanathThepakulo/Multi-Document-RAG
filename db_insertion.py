@@ -26,25 +26,31 @@ class DB_Connection():
             huggingfacehub_api_token=embedding_api_key,
         )
         
-    async def chunks_converter(self, data):
+    async def embeddings_to_insert_in_db(self, data):
         docs_to_insert = []
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         documents = text_splitter.split_documents(data)
         texts = []
         for doc in documents:
             texts.append(doc.page_content)  
+            
         embeddings = self.embedding_model.embed_documents(texts)    
         for text, emb in zip(texts, embeddings):
             item = {"text":text,'embeddings':emb}
             docs_to_insert.append(item)
         result = await self.uploading_into_db(docs_to_insert)
         return result
+    
+    def query_embedding(self,query):
+        embedding = self.embedding_model.embed_query(query)
+        return embedding
            
+    
     async def pdf_loader(self,file_path):
         loader = PyPDFLoader(file_path)
         data = loader.load()
         print(type(data))
-        result = await self.chunks_converter(data)
+        result = await self.embeddings_to_insert_in_db(data)
         return result
     
     async def uploading_into_db(self,docs_to_insert):
@@ -95,6 +101,31 @@ class DB_Connection():
 
         print("⚠️ Index creation timeout")
 
+    async def vector_search(self, query):
+        pipeline = [
+            {
+            '$vectorSearch':{
+                'index':'vector_index',
+                'path':'embeddings',
+                'queryVector':query,
+                'numCandidates':100,
+                'limit': 5
+            }
+            },{
+            '$project':{
+                '_id':0,
+                'text':1,
+                "score": {"$meta": "vectorSearchScore"}
+            }
+            }
+        ]
+        result = self.collection.aggregate(pipeline)
+        results = [doc async for doc in result]
+        return results
+
+    async def db_connection_close(self):
+        await self.client.close()
+        
 
 
 db_connection = DB_Connection()
