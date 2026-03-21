@@ -5,3 +5,37 @@
 # Document versioning
 # Metadata filtering
 
+from pydantic import BaseModel
+from fastapi import FastAPI
+from db_insertion import DB_Connection
+from retrieval_logic import ModelCaller
+
+app = FastAPI()
+
+class Validating_user_query(BaseModel):
+    query:str
+    
+class Validating_db_insertion(BaseModel):
+    path: str     # ← renamed for clarity
+
+db_connection = DB_Connection()
+
+@app.post('/document/insertion/db')
+async def emb_insertion_in_db(body:Validating_db_insertion):
+    result = await db_connection.pdf_loader(body.path)
+    print(result)
+    await db_connection.create_vector_index()
+    return {"status": 200, "inserted_count": result.get("inserted_count", 0)}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",              
+        host='localhost',
+        port=9000
+        # reload=True             
+    )
+
+
+
