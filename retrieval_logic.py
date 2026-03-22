@@ -2,6 +2,7 @@
 from langchain.chat_models import init_chat_model
 from dotenv import load_dotenv
 import os
+from db_insertion import DB_Connection
 
 load_dotenv()
 
@@ -12,13 +13,15 @@ class ModelCaller:
             raise ValueError("GROQ_API_KEY not found in .env")
             
         self.llm = init_chat_model(
-            model="openai/gpt-oss-120b",      # correct ID
+            model="openai/gpt-oss-120b", 
+            model_provider='groq',
             api_key=api_key,
             temperature=0.0,                  # usually better for RAG
             max_tokens=1500,
             max_retries=4,
             # reasoning_format="parsed"       # if you want structured output later
         )
+        # self.db_connection = DB_Connection()
 
     async def generate(self, query: str, context: str) -> str:
         prompt = f"""You are a precise RAG assistant. Answer only using the provided context.
@@ -46,11 +49,11 @@ Answer:"""
             texts.append(doc['text'])
         context = "\n\n".join(texts)
         
-        ai_reply = self.model_calling(question, context)
+        ai_reply = await self.generate(question, context)
         # await db_connection.db_connection_close()
         return {
             'status': 200,
-            'answer': ai_reply.content
+            'answer': ai_reply
         }
 
 async def main():
