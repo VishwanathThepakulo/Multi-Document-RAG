@@ -10,6 +10,7 @@ dependencies = [
     "langchain-community>=0.4.1",
     "langchain-groq>=1.1.2",
     "langchain-huggingface>=1.2.1",
+    "langchain-mongodb>=0.11.0",
     "langchain-text-splitters>=1.1.1",
     "motor>=3.7.1",
     "pymongo>=4.16.0",

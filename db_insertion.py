@@ -8,6 +8,9 @@ from langchain_huggingface import HuggingFaceEndpointEmbeddings
 import asyncio
 from pymongo.operations import SearchIndexModel
 import time
+from langchain_mongodb import MongoDBAtlasVectorSearch
+from langchain_mongodb.retrievers.hybrid_search import MongoDBAtlasHybridSearchRetriever
+from pymongo import MongoClient
 
 load_dotenv()
 
@@ -25,7 +28,30 @@ class DB_Connection():
             model="sentence-transformers/all-MiniLM-L6-v2",
             huggingfacehub_api_token=embedding_api_key,
         )
+        self.sync_client = MongoClient(db_credential)
+        self.sync_collection = self.sync_client['multi_document_rag']['searchable_docs']
+
         
+        
+    def reranking_vectors(self):
+        vector_store = MongoDBAtlasVectorSearch(
+            collection = self.sync_collection,
+            embedding = self.embedding_model,
+            index_name = "vector_index",
+            embedding_key = "embeddings",
+            text_key = 'text'
+        )
+        hybrid_retriever = MongoDBAtlasHybridSearchRetriever(
+            vectorstore=vector_store,
+            search_index_name="fulltext_index",      # ← your BM25/Atlas Search index name
+            top_k=8,                                # candidates before fusion
+            fulltext_penalty=40,                     # tune weights
+            vector_penalty=60,
+        )
+        print(hybrid_retriever)
+        return hybrid_retriever
+    
+    
     async def embeddings_to_insert_in_db(self, data):
         docs_to_insert = []
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -109,7 +135,7 @@ class DB_Connection():
                 'path':'embeddings',
                 'queryVector':query,
                 'numCandidates':100,
-                'limit': 5
+                'limit': 10
             }
             },{
             '$project':{

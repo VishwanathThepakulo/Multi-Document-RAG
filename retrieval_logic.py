@@ -3,6 +3,8 @@ from langchain.chat_models import init_chat_model
 from dotenv import load_dotenv
 import os
 from db_insertion import DB_Connection
+import asyncio
+
 
 load_dotenv()
 
@@ -39,14 +41,38 @@ Answer:"""
 
     async def user_question(self,question):
         db_connection = DB_Connection()
-        embedding_result = db_connection.query_embedding(question)
-        vector_search_result = await db_connection.vector_search(embedding_result)
-        texts = []
-        for doc in vector_search_result:
-            print("-----------------------------------------------------------------------------\n")
-            print(doc["text"][:200])
-            print("-----------------------------------------------------------------------------")
-            texts.append(doc['text'])
+        retriever = db_connection.reranking_vectors()
+        
+        # docs = db_connection.hybrid_retriever.invoke(question)
+        # if not docs:
+        #         return {"status": 200, "answer": "No relevant context found."}
+        # texts = [doc.page_content for doc in docs]
+        
+        docs = await asyncio.get_event_loop().run_in_executor(
+            None,
+            retriever.invoke,
+            question
+        )
+        if not docs:
+                return {"status": 200, "answer": "No relevant context found."}
+        texts = [doc.page_content for doc in docs]
+        i = 0
+        for doc in docs:
+            i+=1
+            print(f'{i}\t{doc.page_content}')
+            print(doc.metadata)
+            print("----------------------")
+    
+        
+        
+        # embedding_result = db_connection.query_embedding(question)
+        # vector_search_result = await db_connection.vector_search(embedding_result)
+        # texts = []
+        # for doc in vector_search_result:
+        #     print("-----------------------------------------------------------------------------\n")
+        #     print(doc["text"][:200])
+        #     print("-----------------------------------------------------------------------------")
+        #     texts.append(doc['text'])
         context = "\n\n".join(texts)
         
         ai_reply = await self.generate(question, context)
