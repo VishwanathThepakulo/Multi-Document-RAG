@@ -11,8 +11,16 @@ import time
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_mongodb.retrievers.hybrid_search import MongoDBAtlasHybridSearchRetriever
 from pymongo import MongoClient
+import logging
 
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger(__name__)
 
 class DB_Connection():
     def __init__(self):
@@ -60,12 +68,27 @@ class DB_Connection():
         for doc in documents:
             texts.append(doc.page_content)  
             
-        embeddings = self.embedding_model.embed_documents(texts)    
-        for text, emb in zip(texts, embeddings):
-            item = {"text":text,'embeddings':emb}
-            docs_to_insert.append(item)
-        result = await self.uploading_into_db(docs_to_insert)
-        return result
+        max_retries = 3
+        embeddings = None
+        for retry in range(max_retries):
+            try:    
+                embeddings = self.embedding_model.embed_documents(texts) 
+                logger.info("Successfully generated embeddings")
+                break
+            except Exception as e:
+                logger.warning(f"Embeddings attempt {retry+1} failed : {e}")
+                if retry<max_retries-1:
+                    await asyncio.sleep(2 ** retry)
+                else:
+                    logger.error("All embeddings retry failed")
+                    return None
+        if embeddings:
+            for text, emb in zip(texts, embeddings):
+                item = {"text":text,'embeddings':emb}
+                docs_to_insert.append(item)
+            result = await self.uploading_into_db(docs_to_insert)
+            return result
+        return None
     
     def query_embedding(self,query):
         embedding = self.embedding_model.embed_query(query)
@@ -73,12 +96,15 @@ class DB_Connection():
            
     
     async def pdf_loader(self,file_path):
-        loader = PyPDFLoader(file_path)
-        data = loader.load()
-        print(type(data))
-        result = await self.embeddings_to_insert_in_db(data)
-        return result
-    
+        try:
+            loader = PyPDFLoader(file_path)
+            data = loader.load()
+            print(type(data))
+            result = await self.embeddings_to_insert_in_db(data)
+            return result
+        except Exception as e:
+            logger.info(f"Pdf upload failed {e}")
+        
     async def uploading_into_db(self,docs_to_insert):
         result = await self.collection.insert_many(docs_to_insert)
         return {
