@@ -4,9 +4,15 @@ from dotenv import load_dotenv
 import os
 from db_insertion import DB_Connection
 import asyncio
+import logging 
 
-
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 class ModelCaller:
     def __init__(self):
@@ -53,6 +59,11 @@ Answer:"""
             retriever.invoke,
             question
         )
+        
+        # filtered_docs = [doc for doc in docs if docs.metadata.get("score",0)>0.5]
+        # filtered_docs = [doc for doc in docs if doc.metadata.get("score", 0) > 0.5]
+        # logger.info(f"================\n{filtered_docs}")
+        
         if not docs:
                 return {"status": 200, "answer": "No relevant context found."}
         texts = [doc.page_content for doc in docs]
