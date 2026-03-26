@@ -53,7 +53,7 @@ class DB_Connection():
             vectorstore=vector_store,
             search_index_name="fulltext_index",      # ← your BM25/Atlas Search index name
             top_k=8,                                # candidates before fusion
-            fulltext_penalty=40,                     # tune weights
+            fulltext_penalty=60,                     # tune weights
             vector_penalty=60,
         )
         print(hybrid_retriever)
@@ -65,8 +65,10 @@ class DB_Connection():
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         documents = text_splitter.split_documents(data)
         texts = []
+        metadatas = []
         for doc in documents:
             texts.append(doc.page_content)  
+            metadatas.append(doc.metadata)
             
         max_retries = 3
         embeddings = None
@@ -83,8 +85,13 @@ class DB_Connection():
                     logger.error("All embeddings retry failed")
                     return None
         if embeddings:
-            for text, emb in zip(texts, embeddings):
-                item = {"text":text,'embeddings':emb}
+            for text, emb, meta in zip(texts, embeddings, metadatas):
+                item = {
+                    "text":text,
+                    'embeddings':emb,
+                    # 'metadata':meta
+                    **meta
+                    }
                 docs_to_insert.append(item)
             result = await self.uploading_into_db(docs_to_insert)
             return result

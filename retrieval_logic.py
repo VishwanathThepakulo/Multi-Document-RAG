@@ -66,12 +66,14 @@ Answer:"""
         
         if not docs:
                 return {"status": 200, "answer": "No relevant context found."}
-        texts = [doc.page_content for doc in docs]
+        texts = [doc.page_content for doc in docs if doc.metadata.get('score')>0.015]
         i = 0
         for doc in docs:
             i+=1
-            print(f'{i}\t{doc.page_content}')
+            # print(f'{i}\t{doc.page_content}')
             print(doc.metadata)
+            print('============================')
+            print(doc.metadata.get('score'))
             print("----------------------")
     
         
@@ -86,11 +88,19 @@ Answer:"""
         #     texts.append(doc['text'])
         context = "\n\n".join(texts)
         
+        sources  = list(set([
+            f"{doc.metadata.get('source')} - Page {doc.metadata.get('page')}" 
+            for doc in docs
+        ]))
+        
+        
         ai_reply = await self.generate(question, context)
         # await db_connection.db_connection_close()
+        logger.info(f"AI response ========\n {ai_reply} \n source is =============\n {sources}")
         return {
             'status': 200,
-            'answer': ai_reply
+            'answer': ai_reply,
+            'sources' : sources 
         }
 
 async def main():
