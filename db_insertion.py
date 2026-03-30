@@ -12,6 +12,7 @@ from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_mongodb.retrievers.hybrid_search import MongoDBAtlasHybridSearchRetriever
 from pymongo import MongoClient
 import logging
+import hashlib
 
 load_dotenv()
 
@@ -60,7 +61,7 @@ class DB_Connection():
         return hybrid_retriever
     
     
-    async def embeddings_to_insert_in_db(self, data):
+    async def embeddings_to_insert_in_db(self, data, file_hash):
         docs_to_insert = []
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         documents = text_splitter.split_documents(data)
@@ -90,7 +91,8 @@ class DB_Connection():
                     "text":text,
                     'embeddings':emb,
                     # 'metadata':meta
-                    **meta
+                    **meta,
+                    'file_hash':file_hash
                     }
                 docs_to_insert.append(item)
             result = await self.uploading_into_db(docs_to_insert)
@@ -104,10 +106,20 @@ class DB_Connection():
     
     async def pdf_loader(self,file_path):
         try:
+            with open(file_path,'rb') as f:
+                file_hash = hashlib.sha256(f.read()).hexdigest()
+                logger.info(f"hash=================={file_hash}")
+                
+            result = await self.collection.find_one({"file_hash": file_hash})
+            if result:
+                return {"status": 409, "message": "Document already exists"}
+            
             loader = PyPDFLoader(file_path)
             data = loader.load()
-            print(type(data))
-            result = await self.embeddings_to_insert_in_db(data)
+            logger.debug(type(data))
+            
+
+            result = await self.embeddings_to_insert_in_db(data, file_hash)
             return result
         except Exception as e:
             logger.info(f"Pdf upload failed {e}")
@@ -187,19 +199,19 @@ class DB_Connection():
         
 
 
-db_connection = DB_Connection()
+# db_connection = DB_Connection()
 
-async def main():
-    input_file_path = input("Enter File path :").strip('"')
-    file_path = rf"{input_file_path}"
-    result = await db_connection.pdf_loader(file_path)
-    print(result)
-    await db_connection.create_vector_index()
+# async def main():
+#     input_file_path = input("Enter File path :").strip('"')
+#     file_path = rf"{input_file_path}"
+#     result = await db_connection.pdf_loader(file_path)
+#     print(result)
+#     await db_connection.create_vector_index()
 
 
 
-if __name__=='__main__':
-    asyncio.run(main())
+# if __name__=='__main__':
+#     asyncio.run(main())
 
 
 

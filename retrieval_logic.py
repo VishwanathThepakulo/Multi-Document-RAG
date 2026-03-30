@@ -29,7 +29,8 @@ class ModelCaller:
             max_retries=4,
             # reasoning_format="parsed"       # if you want structured output later
         )
-        # self.db_connection = DB_Connection()
+        self.db_connection = DB_Connection()
+        self.retriever = self.db_connection.reranking_vectors()
 
     async def generate(self, query: str, context: str) -> str:
         prompt = f"""You are a precise RAG assistant. Answer only using the provided context.
@@ -46,8 +47,7 @@ Answer:"""
         return response.content.strip()
 
     async def user_question(self,question):
-        db_connection = DB_Connection()
-        retriever = db_connection.reranking_vectors()
+        # retriever = self.db_connection.reranking_vectors()
         
         # docs = db_connection.hybrid_retriever.invoke(question)
         # if not docs:
@@ -56,7 +56,7 @@ Answer:"""
         
         docs = await asyncio.get_event_loop().run_in_executor(
             None,
-            retriever.invoke,
+            self.retriever.invoke,
             question
         )
         
@@ -67,17 +67,20 @@ Answer:"""
         if not docs:
                 return {"status": 200, "answer": "No relevant context found."}
         texts = [doc.page_content for doc in docs if doc.metadata.get('score')>0.015]
+        
+        if not texts:
+            logger.info("No relative chunk found")
+            return None
+        
         i = 0
         for doc in docs:
             i+=1
             # print(f'{i}\t{doc.page_content}')
-            print(doc.metadata)
-            print('============================')
-            print(doc.metadata.get('score'))
-            print("----------------------")
+            logger.debug(doc.metadata)
+            logger.debug('============================')
+            logger.debug(doc.metadata.get('score'))
+            logger.debug("----------------------")
     
-        
-        
         # embedding_result = db_connection.query_embedding(question)
         # vector_search_result = await db_connection.vector_search(embedding_result)
         # texts = []
@@ -90,7 +93,7 @@ Answer:"""
         
         sources  = list(set([
             f"{doc.metadata.get('source')} - Page {doc.metadata.get('page')}" 
-            for doc in docs
+            for doc in docs if doc.metadata.get('score') > 0.015
         ]))
         
         
