@@ -57,7 +57,7 @@ class DB_Connection():
             fulltext_penalty=60,                     # tune weights
             vector_penalty=60,
         )
-        print(hybrid_retriever)
+        logger.debug(hybrid_retriever)
         return hybrid_retriever
     
     
@@ -132,6 +132,7 @@ class DB_Connection():
         }
         
     async def create_vector_index(self):
+        await self.collection.create_index("file_hash", unique=False)
         existing = [idx async for idx in self.collection.list_search_indexes()]
         for idx in existing:
             if idx["name"] == "vector_index":
